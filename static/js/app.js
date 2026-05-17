@@ -11,193 +11,7 @@
    1. DEMO DATA — Replace with real API calls later
 ---------------------------------------------------------------- */
 
-/** @type {Array<Object>} Product comparison data across stores */
-const PRODUCT_DATA = [
-  {
-    id: 1,
-    store: 'Amazon',
-    emoji: '🛒',
-    storeType: 'Global Marketplace',
-    price: 114900,
-    originalPrice: 129900,
-    discount: 12,
-    rating: 4.6,
-    reviewCount: 18420,
-    delivery: 'Free delivery by Tomorrow',
-    cashback: 'Up to ₹3,000 cashback (HDFC)',
-    availability: 'In Stock',
-    trend: 'down',
-    trendText: '↓ 3.2% this week',
-    badges: ['best-deal', 'lowest'],
-    isBestDeal: true,
-    buyUrl: '#'
-  },
-  {
-    id: 2,
-    store: 'Flipkart',
-    emoji: '🏪',
-    storeType: 'Indian E-commerce',
-    price: 116499,
-    originalPrice: 129900,
-    discount: 10,
-    rating: 4.5,
-    reviewCount: 24312,
-    delivery: 'Free delivery in 2 days',
-    cashback: '5% unlimited cashback (Axis)',
-    availability: 'In Stock',
-    trend: 'down',
-    trendText: '↓ 1.8% this week',
-    badges: ['sale'],
-    isBestDeal: false,
-    buyUrl: '#'
-  },
-  {
-    id: 3,
-    store: 'Apple Store',
-    emoji: '🍎',
-    storeType: 'Official Retailer',
-    price: 129900,
-    originalPrice: 129900,
-    discount: 0,
-    rating: 4.9,
-    reviewCount: 8724,
-    delivery: 'Free same-day delivery (select cities)',
-    cashback: '3% Daily Cash with Apple Card',
-    availability: 'In Stock',
-    trend: 'stable',
-    trendText: '→ No change',
-    badges: ['official'],
-    isBestDeal: false,
-    buyUrl: '#'
-  },
-  {
-    id: 4,
-    store: 'Croma',
-    emoji: '🏬',
-    storeType: 'Electronics Retail',
-    price: 119990,
-    originalPrice: 129900,
-    discount: 8,
-    rating: 4.3,
-    reviewCount: 3621,
-    delivery: 'Free delivery in 3–4 days',
-    cashback: '10% off on Tata Neu Pay',
-    availability: 'Limited Stock (3 left)',
-    trend: 'stable',
-    trendText: '→ Stable this week',
-    badges: [],
-    isBestDeal: false,
-    buyUrl: '#'
-  },
-  {
-    id: 5,
-    store: 'Vijay Sales',
-    emoji: '🔌',
-    storeType: 'Electronics Chain',
-    price: 121000,
-    originalPrice: 129900,
-    discount: 7,
-    rating: 4.2,
-    reviewCount: 1894,
-    delivery: 'Free delivery in 4–5 days',
-    cashback: null,
-    availability: 'In Stock',
-    trend: 'up',
-    trendText: '↑ 0.5% this week',
-    badges: [],
-    isBestDeal: false,
-    buyUrl: '#'
-  },
-  {
-    id: 6,
-    store: 'Reliance Digital',
-    emoji: '📱',
-    storeType: 'Digital Retail',
-    price: 123000,
-    originalPrice: 129900,
-    discount: 5,
-    rating: 4.1,
-    reviewCount: 2140,
-    delivery: 'Delivery in 5 days',
-    cashback: '₹2,000 off on exchange',
-    availability: 'Out of Stock Online',
-    trend: 'down',
-    trendText: '↓ 2.1% this week',
-    badges: [],
-    isBestDeal: false,
-    buyUrl: '#'
-  }
-];
 
-/** @type {Array<Object>} Price alert notifications */
-const ALERTS_DATA = [
-  {
-    id: 1,
-    type: 'positive',
-    icon: '📉',
-    product: 'iPhone 16 Pro · 256GB',
-    title: 'Price Dropped 12% on Amazon!',
-    message: 'Amazon just reduced the iPhone 16 Pro price from ₹1,29,900 to ₹1,14,900. This is the lowest price in the last 6 months.',
-    store: 'Amazon',
-    time: '2 min ago',
-    action: 'View Deal'
-  },
-  {
-    id: 2,
-    type: 'info',
-    icon: '🎯',
-    product: 'MacBook Air M3 · 8GB',
-    title: 'Best Buying Window Detected',
-    message: 'AI analysis shows that the next 72 hours are the optimal buying window for MacBook Air M3 based on seasonal patterns.',
-    store: 'Flipkart',
-    time: '18 min ago',
-    action: 'Check Price'
-  },
-  {
-    id: 3,
-    type: 'warning',
-    icon: '📈',
-    product: 'Sony WH-1000XM5',
-    title: 'Price Surge Warning — Act Fast!',
-    message: 'Sony WH-1000XM5 headphones are predicted to increase by ₹3,000–₹4,000 within 2 weeks due to festive demand.',
-    store: 'Multiple Stores',
-    time: '1 hr ago',
-    action: 'Buy Now'
-  },
-  {
-    id: 4,
-    type: 'positive',
-    icon: '🏆',
-    product: 'Samsung QLED Q80C 55"',
-    title: 'Amazon Currently Cheapest!',
-    message: 'Amazon is ₹8,000 cheaper than Flipkart for the Samsung QLED Q80C right now. Cashback + no-cost EMI available.',
-    store: 'Amazon',
-    time: '2 hr ago',
-    action: 'View Deal'
-  },
-  {
-    id: 5,
-    type: 'neutral',
-    icon: '🔔',
-    product: 'PS5 Slim · Disc Edition',
-    title: 'Your Price Alert Triggered',
-    message: 'PS5 Slim has reached your target price of ₹49,990 on Flipkart. You set this alert 23 days ago.',
-    store: 'Flipkart',
-    time: '4 hr ago',
-    action: 'Buy Now'
-  },
-  {
-    id: 6,
-    type: 'urgent',
-    icon: '⚡',
-    product: 'Nike Air Jordan 1 OG',
-    title: 'Flash Sale — Ends in 2 Hours!',
-    message: 'Nike Air Jordan 1 Retro High OG is 40% off on Amazon for the next 2 hours. Only 7 pairs left in your size.',
-    store: 'Amazon',
-    time: '5 min ago',
-    action: 'Grab Deal'
-  }
-];
 
 /** @type {Array<string>} AI chat responses for demo */
 const AI_RESPONSES = {
@@ -327,10 +141,9 @@ const Sidebar = (() => {
 })();
 
 /* ----------------------------------------------------------------
-   4. CHAT MODULE
+   4. SEARCH MODULE (Replaces Chat)
 ---------------------------------------------------------------- */
-const Chat = (() => {
-  const messagesEl    = document.getElementById('chatMessages');
+const Search = (() => {
   const inputEl       = document.getElementById('chatInput');
   const sendBtn       = document.getElementById('sendBtn');
   const suggestedEl   = document.getElementById('suggestedPrompts');
@@ -338,80 +151,10 @@ const Chat = (() => {
 
   let hasInteracted = false;
 
-  /** Determine which AI response to show based on message content */
-  function pickResponse(text) {
-    const t = text.toLowerCase();
-    if (t.includes('iphone') || t.includes('16 pro'))   return AI_RESPONSES.iphone;
-    if (t.includes('macbook'))                            return AI_RESPONSES.macbook;
-    if (t.includes('ps5'))                               return AI_RESPONSES.ps5;
-    if (t.includes('tv') || t.includes('samsung') || t.includes('qled')) return AI_RESPONSES.tv;
-    if (t.includes('sony') || t.includes('headphone') || t.includes('xm5')) return AI_RESPONSES.headphones;
-    if (t.includes('jordan') || t.includes('nike'))      return AI_RESPONSES.jordan;
-    return AI_RESPONSES.default;
-  }
-
-  /**
-   * Render a message bubble in the chat
-   * @param {'ai'|'user'} role
-   * @param {string} text  Markdown-lite (bold **text**)
-   */
-  function appendMessage(role, text) {
-    const msg = document.createElement('div');
-    msg.className = `msg ${role}`;
-
-    const avatarText = role === 'ai' ? 'AI' : 'AK';
-    const senderName = role === 'ai' ? 'PriceAI' : 'You';
-
-    // Simple markdown: **bold**
-    const html = text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n\n/g, '<br><br>')
-      .replace(/\n/g, '<br>');
-
-    msg.innerHTML = `
-      <div class="msg-avatar ${role}">${avatarText}</div>
-      <div class="msg-body">
-        <div class="msg-sender">${senderName}</div>
-        <div class="msg-bubble">${html}</div>
-      </div>
-    `;
-
-    messagesEl.appendChild(msg);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return msg;
-  }
-
-  /** Show animated typing indicator */
-  function showTyping() {
-    const indicator = document.createElement('div');
-    indicator.className = 'msg ai typing-indicator';
-    indicator.id = 'typingIndicator';
-    indicator.innerHTML = `
-      <div class="msg-avatar ai">AI</div>
-      <div class="msg-body">
-        <div class="msg-sender">PriceAI</div>
-        <div class="msg-bubble">
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-        </div>
-      </div>
-    `;
-    messagesEl.appendChild(indicator);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  /** Remove typing indicator */
-  function hideTyping() {
-    document.getElementById('typingIndicator')?.remove();
-  }
-
-  /** Handle sending a message */
-  async function sendMessage(text) {
+  async function performSearch(text) {
     text = (text || inputEl.value).trim();
     if (!text) return;
 
-    // Hide prompts after first interaction
     if (!hasInteracted) {
       suggestedEl.style.opacity = '0';
       await sleep(200);
@@ -420,70 +163,25 @@ const Chat = (() => {
     }
 
     inputEl.value = '';
-    sendBtn.style.opacity = '0.6';
-    sendBtn.style.pointerEvents = 'none';
-
-    appendMessage('user', text);
-    await sleep(300);
-    showTyping();
-
-    try {
-      // Call Flask backend API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: text })
-      });
-
-      const data = await response.json();
-
-      hideTyping();
-
-      if (data.reply) {
-        appendMessage('ai', data.reply);
-      } else {
-        appendMessage('ai', 'Sorry, I couldn\'t process that request. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      hideTyping();
-      appendMessage('ai', 'Sorry, something went wrong. Please check your connection and try again.');
-    }
-
-    sendBtn.style.opacity = '1';
-    sendBtn.style.pointerEvents = 'auto';
-    inputEl.focus();
-  }
-
-  /** Welcome message on load */
-  function showWelcome() {
-    appendMessage('ai',
-      `👋 Welcome to **PriceAI** — your intelligent price comparison assistant!\n\n` +
-      `I can compare prices across 50+ stores, predict future price trends using ML, and tell you the **exact best time to buy**.\n\n` +
-      `Try asking about any product below, or pick a suggested prompt to get started! 🚀`
-    );
+    
+    // Call the Products refresh directly
+    Products.refresh(text);
   }
 
   function init() {
-    showWelcome();
+    sendBtn.addEventListener('click', () => performSearch());
 
-    // Send on button click
-    sendBtn.addEventListener('click', () => sendMessage());
-
-    // Send on Enter key
     inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter') {
         e.preventDefault();
-        sendMessage();
+        performSearch();
       }
     });
 
-    // Prompt chips
     promptsRow.querySelectorAll('.prompt-chip').forEach(chip => {
-      chip.addEventListener('click', () => sendMessage(chip.dataset.prompt));
+      chip.addEventListener('click', () => performSearch(chip.dataset.prompt));
     });
+  }
 
     // Keyboard shortcut ⌘K / Ctrl+K to focus input
     document.addEventListener('keydown', (e) => {
@@ -496,7 +194,6 @@ const Chat = (() => {
 
   return { init };
 })();
-
 /* ----------------------------------------------------------------
    5. PRODUCTS MODULE
 ---------------------------------------------------------------- */
@@ -504,6 +201,7 @@ const Products = (() => {
   const grid = document.getElementById('productsGrid');
   const sortSelect = document.getElementById('sortSelect');
   const refreshBtn = document.getElementById('refreshBtn');
+  let currentProductData = [];
 
   /** Build HTML for a single product card */
   function buildCard(p, index) {
@@ -541,7 +239,7 @@ const Products = (() => {
             <div class="pc-store-emoji">${p.emoji}</div>
             <div>
               <div class="pc-store-name">${p.store}</div>
-              <div class="pc-store-type">${p.storeType}</div>
+              <div class="pc-store-type">${p.seller_name || 'Verified Seller'}</div>
             </div>
           </div>
           <div class="pc-badges">${badgesHtml}</div>
@@ -583,28 +281,56 @@ const Products = (() => {
   }
 
   /** Simulate a refresh with skeleton effect */
-  async function refresh() {
+  async function refresh(query = '') {
     grid.innerHTML = `
       <div class="skeleton-card"><div class="skeleton-shine"></div><div class="sk-block sk-tall"></div><div class="sk-block sk-med"></div><div class="sk-block sk-short"></div></div>
       <div class="skeleton-card"><div class="skeleton-shine"></div><div class="sk-block sk-tall"></div><div class="sk-block sk-med"></div><div class="sk-block sk-short"></div></div>
       <div class="skeleton-card"><div class="skeleton-shine"></div><div class="sk-block sk-tall"></div><div class="sk-block sk-med"></div><div class="sk-block sk-short"></div></div>
     `;
-    await sleep(1400);
-    render(sortProducts(sortSelect.value, PRODUCT_DATA));
+    try {
+      const url = query ? `/api/products?q=${encodeURIComponent(query)}` : '/api/products';
+      const res = await fetch(url);
+      const data = await res.json();
+      currentProductData = data;
+      
+      // Update the page title
+      if (query) {
+        const titleEl = document.getElementById('productTitle');
+        if (titleEl) {
+          // Capitalize first letter
+          titleEl.innerText = query.charAt(0).toUpperCase() + query.slice(1);
+        }
+      }
+      
+      render(sortProducts(sortSelect.value, currentProductData));
+    } catch (e) {
+      console.error(e);
+      grid.innerHTML = '<p style="color: #ff6b6b; padding: 20px;">Error loading products from server.</p>';
+    }
   }
 
   function init() {
-    // Initial load with skeleton delay
-    setTimeout(() => render(PRODUCT_DATA), 1200);
+    refresh();
 
     sortSelect.addEventListener('change', () => {
-      render(sortProducts(sortSelect.value, PRODUCT_DATA));
+      render(sortProducts(sortSelect.value, currentProductData));
     });
 
-    refreshBtn.addEventListener('click', refresh);
+    refreshBtn.addEventListener('click', () => refresh());
+    
+    // Add event listener for the top search bar
+    const searchBar = document.getElementById('searchBar');
+    if (searchBar) {
+      searchBar.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          refresh(searchBar.value.trim());
+        }
+      });
+    }
   }
 
-  return { init };
+  return { init, refresh };
 })();
 
 /* ----------------------------------------------------------------
@@ -635,9 +361,15 @@ const Alerts = (() => {
     `;
   }
 
-  function init() {
+  async function init() {
     if (!grid) return;
-    grid.innerHTML = ALERTS_DATA.map((a, i) => buildAlert(a, i)).join('');
+    try {
+      const res = await fetch('/api/alerts');
+      const data = await res.json();
+      grid.innerHTML = data.map((a, i) => buildAlert(a, i)).join('');
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   return { init };
@@ -1171,7 +903,7 @@ const Notifications = (() => {
 ---------------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
   Sidebar.init();
-  Chat.init();
+  Search.init();
   SmoothScroll.init();
   NavbarScroll.init();
   MobileSidebar.init();
