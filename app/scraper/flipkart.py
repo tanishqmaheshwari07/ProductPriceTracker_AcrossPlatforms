@@ -49,6 +49,15 @@ class FlipkartScraper(BaseScraper):
                 orig_price = int(price * 1.1) # Fallback 10% mock if not found
                 discount = 10
                 
+                # Attempt to find the exact product link
+                product_url = url
+                a_tag = title_elem if title_elem.name == 'a' else title_elem.find_parent('a')
+                if not a_tag and parent:
+                    a_tag = parent.find_parent('a') or parent.find('a')
+                    
+                if a_tag and a_tag.has_attr('href'):
+                    product_url = "https://www.flipkart.com" + a_tag['href']
+
                 results.append({
                     "id": f"flp_{int(time.time())}_{random.randint(100,999)}",
                     "title": title,
@@ -61,7 +70,7 @@ class FlipkartScraper(BaseScraper):
                     "rating": 4.3,
                     "reviewCount": random.randint(500, 15000),
                     "availability": "In Stock",
-                    "buyUrl": url
+                    "buyUrl": product_url
                 })
         except Exception as e:
             print(f"Flipkart Scraper Error: {e}")

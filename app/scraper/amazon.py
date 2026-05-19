@@ -46,7 +46,13 @@ class AmazonScraper(BaseScraper):
                 discount = int(((orig_price - price) / orig_price) * 100) if orig_price > 0 else 0
                 
                 link_elem = product.find('a', class_='a-link-normal')
-                buy_url = "https://www.amazon.in" + link_elem['href'] if link_elem else url
+                buy_url = url
+                if link_elem and link_elem.has_attr('href'):
+                    href = link_elem['href']
+                    if href.startswith('http'):
+                        buy_url = href
+                    else:
+                        buy_url = "https://www.amazon.in" + href
                 
                 # Seller info usually requires a secondary request on Amazon, so we mock it dynamically or leave it as "Amazon"
                 seller_name = "Amazon Retail" if "Amazon" in title else "Verified Seller"
