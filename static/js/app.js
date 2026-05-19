@@ -190,7 +190,6 @@ const Search = (() => {
         inputEl.focus();
       }
     });
-  }
 
   return { init };
 })();

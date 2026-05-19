@@ -27,6 +27,16 @@ def process_scraped_data(raw_results):
         # Reset any leftover flags
         lowest_item['isBestDeal'] = False 
         
+        # Initialize missing fields required by frontend
+        if 'badges' not in lowest_item:
+            lowest_item['badges'] = []
+        if 'trend' not in lowest_item:
+            lowest_item['trend'] = 'trend-up'
+        if 'trendText' not in lowest_item:
+            lowest_item['trendText'] = 'Stable'
+        if 'delivery' not in lowest_item:
+            lowest_item['delivery'] = 'Free Delivery'
+            
         final_results.append(lowest_item)
         
     # 3. Pick the absolute lowest price across all stores to be the Best Deal
@@ -37,3 +47,4 @@ def process_scraped_data(raw_results):
             best_deal['badges'].append('best-deal')
             
     return final_results
+

@@ -39,3 +39,9 @@ venv/
 
 # MacOS
 .DS_Store
+
+# Database — DO NOT commit
+priceai.db
+*.db
+*.sqlite3
+instance/
