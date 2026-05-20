@@ -61,3 +61,38 @@ class PriceHistory(db.Model):
             'buyUrl': self.buy_url,
             'timestamp': self.timestamp.isoformat()
         }
+
+class ProductPrediction(db.Model):
+    __tablename__ = 'product_predictions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    
+    predicted_price = db.Column(db.Integer, nullable=False)
+    confidence = db.Column(db.Float, nullable=False)
+    trend = db.Column(db.String(50), nullable=False)
+    buy_recommendation = db.Column(db.String(100), nullable=False)
+    expected_drop_percentage = db.Column(db.Float, nullable=False)
+    prediction_window_days = db.Column(db.Integer, nullable=False)
+    
+    # Store future dates and prices as JSON for charts
+    future_dates = db.Column(db.Text, nullable=True) # JSON list
+    future_prices = db.Column(db.Text, nullable=True) # JSON list
+    
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'product_id': self.product_id,
+            'predicted_price': self.predicted_price,
+            'confidence': self.confidence,
+            'trend': self.trend,
+            'buy_recommendation': self.buy_recommendation,
+            'expected_drop_percentage': self.expected_drop_percentage,
+            'prediction_window_days': self.prediction_window_days,
+            'future_dates': json.loads(self.future_dates) if self.future_dates else [],
+            'future_prices': json.loads(self.future_prices) if self.future_prices else [],
+            'timestamp': self.timestamp.isoformat()
+        }

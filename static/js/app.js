@@ -334,6 +334,12 @@ const Products = (() => {
           Charts.fetchHistory(queryToFetch).then(histData => {
               Charts.renderHistoricalChart(histData);
           });
+          if (typeof Prediction !== 'undefined' && Prediction.fetchPrediction) {
+              Prediction.fetchPrediction(queryToFetch).then(predData => {
+                  Prediction.renderPrediction(predData);
+                  Charts.renderPredictionChart(predData);
+              });
+          }
       }
       
       // Update global
@@ -418,6 +424,93 @@ const Alerts = (() => {
   }
 
   return { init };
+})();
+
+/* ----------------------------------------------------------------
+   6.5. PREDICTION MODULE
+---------------------------------------------------------------- */
+const Prediction = (() => {
+  async function fetchPrediction(query) {
+    if (!query) return null;
+    try {
+      const res = await fetch('/api/predict?q=' + encodeURIComponent(query));
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }
+
+  function renderPrediction(data) {
+    if (!data || !data.predicted_price || data.predicted_price === 0) {
+      const recCard = document.getElementById('recCard');
+      if (recCard) {
+          const action = recCard.querySelector('.verdict-action');
+          if (action) action.textContent = 'Need More Data';
+      }
+      return;
+    }
+
+    const recCard = document.getElementById('recCard');
+    if (recCard) {
+      const conf = recCard.querySelector('.rec-confidence-pill');
+      if (conf) conf.textContent = `${data.confidence}% confidence`;
+
+      const action = recCard.querySelector('.verdict-action');
+      if (action) action.textContent = data.buy_recommendation;
+
+      const reason = recCard.querySelector('.verdict-reason');
+      if (reason) {
+          if (data.buy_recommendation === 'WAIT') {
+              reason.textContent = `High probability of price drop in ${data.prediction_window_days} days. Trend is ${data.trend}.`;
+          } else {
+              reason.textContent = `Trend is ${data.trend}. Best time to buy is now.`;
+          }
+      }
+
+      const values = recCard.querySelectorAll('.rdi-value');
+      if (values.length >= 3) {
+          const dropAmount = (data.current_price - data.predicted_price);
+          values[0].textContent = data.expected_drop_percentage > 0 
+              ? `−₹${formatINR(dropAmount)} (~${data.expected_drop_percentage}%)` 
+              : 'None expected';
+          values[1].textContent = `₹${formatINR(data.predicted_price)}`;
+          values[2].textContent = data.prediction_window_days > 0 
+              ? `In ~${data.prediction_window_days} Days` 
+              : 'Immediately';
+      }
+    }
+
+    const metricsGrid = document.querySelector('.metrics-grid');
+    if (metricsGrid) {
+      const values = metricsGrid.querySelectorAll('.mc-value');
+      const notes = metricsGrid.querySelectorAll('.mc-note');
+      const bars = metricsGrid.querySelectorAll('.mc-fill');
+
+      if (values.length >= 6) {
+          values[0].textContent = `${Math.min(100, Math.round(data.expected_drop_percentage * 10))}%`;
+          if (bars[0]) bars[0].style.width = `${Math.min(100, Math.round(data.expected_drop_percentage * 10))}%`;
+
+          values[1].textContent = data.trend === 'Falling' ? 'Downward ↓' : (data.trend === 'Rising' ? 'Upward ↑' : 'Stable →');
+          
+          const volStr = data.confidence > 80 ? 'Low' : (data.confidence > 50 ? 'Medium' : 'High');
+          values[2].textContent = volStr;
+          if (bars[1]) bars[1].style.width = volStr === 'Low' ? '20%' : (volStr === 'Medium' ? '50%' : '80%');
+
+          values[3].textContent = data.buy_recommendation === 'BUY NOW' ? 'Bullish' : 'Cautious';
+          
+          values[4].textContent = data.prediction_window_days > 0 
+              ? `In ${data.prediction_window_days} days` 
+              : 'Today';
+              
+          const dropAmt = data.current_price - data.predicted_price;
+          values[5].textContent = dropAmt > 0 ? `₹${formatINR(dropAmt)}` : '₹0';
+      }
+    }
+  }
+
+  return { fetchPrediction, renderPrediction };
 })();
 
 /* ----------------------------------------------------------------
@@ -513,11 +606,60 @@ const Charts = (() => {
     });
   }
 
+  function renderPredictionChart(data) {
+    const ctx = document.getElementById('predictionChart');
+    if (!ctx) return;
+    
+    if (instances['predictionChart']) {
+        instances['predictionChart'].destroy();
+    }
+
+    if (!data || !data.future_dates || data.future_dates.length === 0) {
+        return;
+    }
+
+    const labels = [new Date().toLocaleDateString(), ...data.future_dates];
+    const prices = [data.current_price, ...data.future_prices];
+
+    instances['predictionChart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Predicted Price',
+                data: prices,
+                borderColor: C.coral,
+                backgroundColor: C.coral + '33',
+                borderWidth: 2,
+                tension: 0.4,
+                borderDash: [5, 5],
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: { color: C.grid }
+                },
+                x: {
+                    grid: { color: C.grid }
+                }
+            }
+        }
+    });
+  }
+
   function init() {
     // We will refresh the charts whenever a new search happens via refresh()
   }
 
-  return { init, fetchHistory, renderHistoricalChart };
+  return { init, fetchHistory, renderHistoricalChart, renderPredictionChart };
 })();
 /* ----------------------------------------------------------------
    8. COUNTER ANIMATIONS MODULE of f
