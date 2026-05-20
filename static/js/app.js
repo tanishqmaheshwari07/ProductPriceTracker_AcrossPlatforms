@@ -202,62 +202,95 @@ const Products = (() => {
   const refreshBtn = document.getElementById('refreshBtn');
   let currentProductData = [];
 
-  /** Build HTML for a single product card */
+  /** Build HTML for a single product variant card */
   function buildCard(p, index) {
-    const badgesHtml = p.badges.map(b => {
-      const labels = { 'best-deal': '🏆 Best Deal', lowest: '💚 Lowest Price', official: '✅ Official', sale: '🔥 Sale' };
-      const classes = { 'best-deal': 'badge-best', lowest: 'badge-lowest', official: 'badge-official', sale: 'badge-sale' };
-      return `<span class="badge ${classes[b]}">${labels[b]}</span>`;
-    }).join('');
+    // Find absolute cheapest platform
+    let absoluteLowest = null;
+    let absoluteStore = null;
+    let platformsHtml = '';
+    let backlogHtml = '';
+    
+    // Sort platforms by lowest price to find the absolute best
+    const sortedPlatforms = Object.entries(p.platforms).sort((a, b) => a[1].lowest_price - b[1].lowest_price);
+    
+    // Determine absolute lowest using the RecommendationEngine's chosen best_platform if available
+    if (p.best_platform && p.platforms[p.best_platform]) {
+      absoluteStore = p.best_platform;
+      absoluteLowest = p.platforms[p.best_platform];
+    } else {
+      // Fallback
+      if (sortedPlatforms.length > 0) {
+        absoluteStore = sortedPlatforms[0][0];
+        absoluteLowest = sortedPlatforms[0][1];
+      }
+    }
+    
+    if (!absoluteLowest) return ''; // Skip if empty
+    
+    // Build backlog dropdown
+    for (const [store, data] of sortedPlatforms) {
+        let storeEmoji = store.toLowerCase() === 'amazon' ? '🛒' : '🏪';
+        backlogHtml += `
+          <div class="backlog-store-group">
+            <h4 style="margin: 10px 0 5px 0; font-size: 0.9rem; color: #fff;">${storeEmoji} ${store.charAt(0).toUpperCase() + store.slice(1)}</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.85rem; color: #ccc;">
+        `;
+        
+        data.all_sellers_backlog.forEach(seller => {
+            backlogHtml += `
+              <li style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <span>${seller.seller_name}</span>
+                <span>
+                  <strong style="color: #00ff9d;">₹${formatINR(seller.price)}</strong>
+                  <a href="${seller.link}" target="_blank" style="color: #00d4ff; text-decoration: none; margin-left: 8px;">Buy ↗</a>
+                </span>
+              </li>
+            `;
+        });
+        
+        backlogHtml += `</ul></div>`;
+    }
 
-    const discountHtml = p.discount > 0
-      ? `<span class="pc-orig-price">₹${formatINR(p.originalPrice)}</span>
-         <span class="pc-discount">-${p.discount}%</span>`
-      : '';
+    const ctaText = `Buy on ${absoluteStore.charAt(0).toUpperCase() + absoluteStore.slice(1)} for ₹${formatINR(absoluteLowest.lowest_price)}`;
+    const imgHtml = p.base_image_url ? `<img src="${p.base_image_url}" alt="${p.product_title}" style="width: 100%; height: 160px; object-fit: contain; margin-bottom: 10px; border-radius: 8px; background: rgba(0,0,0,0.2);">` : '';
 
-    const cashbackHtml = p.cashback
-      ? `<div class="pc-cashback">
-           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-           ${p.cashback}
-         </div>` : '';
-
-    const availHtml = p.availability === 'Out of Stock Online'
-      ? `<span class="pc-no-stock">⚠️ ${p.availability}</span>`
-      : `<div class="pc-delivery">
-           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" rx="1" stroke="currentColor" stroke-width="2"/><path d="M16 8h4l3 3v5h-7V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="5.5" cy="18.5" r="2.5" stroke="currentColor" stroke-width="2"/><circle cx="18.5" cy="18.5" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
-           ${p.delivery}
-         </div>`;
-
-    const ctaText = p.availability === 'Out of Stock Online' ? 'Check Availability' : `Buy on ${p.store} →`;
+    const recommendation = absoluteLowest.recommendation;
+    let badgeHtml = '';
+    if (recommendation) {
+        let badgeColor = recommendation.deal_score > 85 ? 'linear-gradient(90deg, #ff007a, #7928ca)' : 'rgba(255, 193, 7, 0.2)';
+        let textColor = recommendation.deal_score > 85 ? '#fff' : '#ffc107';
+        badgeHtml = `<div style="margin-top: 8px; display: inline-block; background: ${badgeColor}; color: ${textColor}; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 0 10px rgba(255,0,122,0.3);">
+            ${recommendation.badge} (Score: ${recommendation.deal_score})
+            <div style="font-size: 0.7rem; font-weight: normal; margin-top: 4px; opacity: 0.9;">
+                ${recommendation.reasons.map(r => `• ${r}`).join('<br>')}
+            </div>
+        </div>`;
+    }
 
     return `
-      <div class="product-card ${p.isBestDeal ? 'best-deal' : ''}" style="animation-delay:${index * 0.08}s">
+      <div class="product-card" style="animation-delay:${index * 0.08}s; display: flex; flex-direction: column;">
         <div class="pc-glow"></div>
+        ${imgHtml}
         <div class="pc-top">
-          <div class="pc-store-info">
-            <div class="pc-store-emoji">${p.emoji}</div>
-            <div>
-              <div class="pc-store-name">${p.store}</div>
-              <div class="pc-store-type">${p.seller_name || 'Verified Seller'}</div>
-            </div>
+          <div class="pc-store-info" style="width: 100%;">
+            <div class="pc-store-name" style="font-size: 1.1rem; white-space: normal; line-height: 1.3;">${p.product_title}</div>
+            ${badgeHtml}
+            ${!badgeHtml && p.match_quality === 'strong' && p.match_type !== 'exact' ? `<div style="margin-top: 8px; display: inline-block; background: rgba(0, 255, 157, 0.1); color: #00ff9d; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; border: 1px solid rgba(0, 255, 157, 0.3);">✨ AI Verified Match (${p.match_confidence}%)</div>` : ''}
+            ${!badgeHtml && p.match_quality === 'possible' ? `<div style="margin-top: 8px; display: inline-block; background: rgba(255, 193, 7, 0.1); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; border: 1px solid rgba(255, 193, 7, 0.3);">⚠️ Possible Match (${p.match_confidence}%)</div>` : ''}
           </div>
-          <div class="pc-badges">${badgesHtml}</div>
         </div>
-        <div class="pc-price-row">
-          <div class="pc-price"><span class="currency">₹</span>${formatINR(p.price)}</div>
-          ${discountHtml}
+        <div class="pc-price-row" style="margin-top: auto; padding-top: 15px;">
+          <div class="pc-price"><span class="currency">₹</span>${formatINR(absoluteLowest.lowest_price)}</div>
         </div>
-        <div class="pc-rating">
-          <span class="stars">${generateStars(p.rating)}</span>
-          <span class="pc-rating-num">${p.rating}</span>
-          <span class="pc-review-count">(${formatINR(p.reviewCount)} reviews)</span>
-        </div>
-        ${availHtml}
-        ${cashbackHtml}
-        <div class="pc-trend">
-          <span class="trend-chip ${p.trend}">${p.trendText}</span>
-        </div>
-        <button class="pc-cta" onclick="window.open('${p.buyUrl}','_blank')">${ctaText}</button>
+        
+        <button class="pc-cta" onclick="window.open('${absoluteLowest.direct_seller_link}','_blank')" style="margin-top: 15px;">${ctaText}</button>
+        
+        <details style="margin-top: 10px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+          <summary style="font-size: 0.85rem; color: #aaa; outline: none;">View All Sellers (${p.platforms[absoluteStore].all_sellers_backlog.length}+)</summary>
+          <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; max-height: 200px; overflow-y: auto;">
+             ${backlogHtml}
+          </div>
+        </details>
       </div>
     `;
   }
@@ -267,14 +300,18 @@ const Products = (() => {
     grid.innerHTML = data.map((p, i) => buildCard(p, i)).join('');
   }
 
-  /** Sort products by given key */
+  /** Sort variants by lowest price */
   function sortProducts(key, data) {
     const sorted = [...data];
+    // Helper to get lowest price of a variant
+    const getLowest = (p) => {
+        const prices = Object.values(p.platforms).map(x => x.lowest_price);
+        return prices.length ? Math.min(...prices) : 999999999;
+    };
+    
     switch (key) {
-      case 'price-asc':  return sorted.sort((a, b) => a.price - b.price);
-      case 'price-desc': return sorted.sort((a, b) => b.price - a.price);
-      case 'rating':     return sorted.sort((a, b) => b.rating - a.rating);
-      case 'discount':   return sorted.sort((a, b) => b.discount - a.discount);
+      case 'price-asc':  return sorted.sort((a, b) => getLowest(a) - getLowest(b));
+      case 'price-desc': return sorted.sort((a, b) => getLowest(b) - getLowest(a));
       default:           return sorted;
     }
   }
@@ -290,14 +327,23 @@ const Products = (() => {
       const url = query ? `/api/products?q=${encodeURIComponent(query)}` : '/api/products';
       const res = await fetch(url);
       const data = await res.json();
-      currentProductData = data;
+      
+      // Fetch history data concurrently or after
+      const queryToFetch = data.search_query || query;
+      if (typeof Charts !== 'undefined' && Charts.fetchHistory) {
+          Charts.fetchHistory(queryToFetch).then(histData => {
+              Charts.renderHistoricalChart(histData);
+          });
+      }
+      
+      // Update global
+      currentProductData = data.results || [];
       
       // Update the page title
-      if (query) {
+      if (data.search_query) {
         const titleEl = document.getElementById('productTitle');
         if (titleEl) {
-          // Capitalize first letter
-          titleEl.innerText = query.charAt(0).toUpperCase() + query.slice(1);
+          titleEl.innerText = data.search_query.charAt(0).toUpperCase() + data.search_query.slice(1);
         }
       }
       
@@ -378,400 +424,101 @@ const Alerts = (() => {
    7. CHARTS MODULE (Canvas-based, no external library)
 ---------------------------------------------------------------- */
 const Charts = (() => {
-
-  /* -- Color palette for charts -- */
-  const C = {
-    teal:   '#00d4ff',
-    mint:   '#00ff9d',
-    amber:  '#ffb84d',
-    coral:  '#ff6b6b',
-    purple: '#c084fc',
-    grid:   'rgba(255,255,255,0.06)',
-    text:   'rgba(238,238,255,0.5)',
-    textHi: 'rgba(238,238,255,0.85)',
-  };
-
-  /* -- Easing -- */
-  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
-  /**
-   * Animated line chart renderer
-   * @param {HTMLCanvasElement} canvas
-   * @param {Object} config
-   */
-  function drawLineChart(canvas, config) {
-    const ctx = canvas.getContext('2d');
-    let animProgress = 0;
-    let animFrame;
-
-    function resize() {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width  = rect.width  * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width  = rect.width  + 'px';
-      canvas.style.height = rect.height + 'px';
-      ctx.scale(dpr, dpr);
-    }
-
-    function draw(progress) {
-      const W = canvas.clientWidth;
-      const H = canvas.clientHeight;
-      const PAD = { top: 20, right: 16, bottom: 40, left: 52 };
-      const plotW = W - PAD.left - PAD.right;
-      const plotH = H - PAD.top  - PAD.bottom;
-
-      ctx.clearRect(0, 0, W, H);
-
-      // Collect all values to determine Y range
-      let allVals = [];
-      config.datasets.forEach(ds => allVals = allVals.concat(ds.data));
-      const minVal = Math.min(...allVals) * 0.975;
-      const maxVal = Math.max(...allVals) * 1.015;
-      const range  = maxVal - minVal;
-
-      const toX = (i) => PAD.left + (i / (config.labels.length - 1)) * plotW;
-      const toY = (v) => PAD.top  + (1 - (v - minVal) / range) * plotH;
-
-      // Draw grid lines
-      const gridCount = 5;
-      ctx.strokeStyle = C.grid;
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= gridCount; i++) {
-        const y = PAD.top + (i / gridCount) * plotH;
-        ctx.beginPath();
-        ctx.moveTo(PAD.left, y);
-        ctx.lineTo(W - PAD.right, y);
-        ctx.stroke();
-
-        // Y axis label
-        const val = maxVal - (i / gridCount) * range;
-        ctx.fillStyle = C.text;
-        ctx.font = `11px 'DM Mono', monospace`;
-        ctx.textAlign = 'right';
-        ctx.fillText('₹' + Math.round(val / 1000) + 'K', PAD.left - 8, y + 4);
-      }
-
-      // X axis labels
-      const labelStep = Math.ceil(config.labels.length / 8);
-      config.labels.forEach((lbl, i) => {
-        if (i % labelStep !== 0) return;
-        ctx.fillStyle = C.text;
-        ctx.font = `10px 'DM Mono', monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText(lbl, toX(i), H - PAD.bottom + 16);
-      });
-
-      // Draw each dataset
-      config.datasets.forEach(ds => {
-        const pts = ds.data.map((v, i) => ({ x: toX(i), y: toY(v) }));
-        const cutoff = Math.floor((pts.length - 1) * progress);
-
-        if (pts.length < 2) return;
-
-        // Fill gradient under line
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, toY(minVal));
-        for (let i = 0; i <= cutoff; i++) {
-          if (i === 0) ctx.lineTo(pts[0].x, pts[0].y);
-          else {
-            const prev = pts[i - 1];
-            const curr = pts[i];
-            const cpx = (prev.x + curr.x) / 2;
-            ctx.bezierCurveTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y);
-          }
-        }
-        ctx.lineTo(pts[cutoff].x, toY(minVal));
-        ctx.closePath();
-        const grad = ctx.createLinearGradient(0, PAD.top, 0, H - PAD.bottom);
-        grad.addColorStop(0,   hexToRgba(ds.color, 0.18));
-        grad.addColorStop(1,   hexToRgba(ds.color, 0.01));
-        ctx.fillStyle = grad;
-        ctx.fill();
-        ctx.restore();
-
-        // Draw line
-        ctx.save();
-        ctx.beginPath();
-        ctx.strokeStyle = ds.color;
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = 'round';
-        ctx.lineCap  = 'round';
-        for (let i = 0; i <= cutoff; i++) {
-          if (i === 0) ctx.moveTo(pts[0].x, pts[0].y);
-          else {
-            const prev = pts[i - 1];
-            const curr = pts[i];
-            const cpx = (prev.x + curr.x) / 2;
-            ctx.bezierCurveTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y);
-          }
-        }
-        ctx.stroke();
-        ctx.restore();
-
-        // Data point dots at cutoff
-        if (progress >= 1) {
-          pts.forEach((pt, i) => {
-            if (i % labelStep !== 0 && i !== pts.length - 1) return;
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = ds.color;
-            ctx.fill();
-            ctx.strokeStyle = '#06060f';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          });
-        }
-      });
-    }
-
-    function animate() {
-      animProgress = Math.min(animProgress + 0.025, 1);
-      draw(easeOutCubic(animProgress));
-      if (animProgress < 1) animFrame = requestAnimationFrame(animate);
-    }
-
-    resize();
-    window.addEventListener('resize', () => { cancelAnimationFrame(animFrame); resize(); animProgress = 0; animate(); });
-    animate();
-  }
-
-  /**
-   * Animated bar chart renderer
-   * @param {HTMLCanvasElement} canvas
-   * @param {Object} config
-   */
-  function drawBarChart(canvas, config) {
-    const ctx = canvas.getContext('2d');
-    let prog = 0;
-    let animFrame;
-
-    function resize() {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width  = rect.width  * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width  = rect.width  + 'px';
-      canvas.style.height = rect.height + 'px';
-      ctx.scale(dpr, dpr);
-    }
-
-    function draw(progress) {
-      const W = canvas.clientWidth;
-      const H = canvas.clientHeight;
-      const PAD = { top: 16, right: 16, bottom: 48, left: 56 };
-      const plotW = W - PAD.left - PAD.right;
-      const plotH = H - PAD.top  - PAD.bottom;
-
-      ctx.clearRect(0, 0, W, H);
-
-      const maxVal = Math.max(...config.data) * 1.1;
-      const barW   = (plotW / config.data.length) * 0.55;
-      const gap    = (plotW / config.data.length) * 0.45;
-
-      // Grid
-      for (let i = 0; i <= 4; i++) {
-        const y = PAD.top + (i / 4) * plotH;
-        ctx.strokeStyle = C.grid;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(PAD.left, y);
-        ctx.lineTo(W - PAD.right, y);
-        ctx.stroke();
-
-        const val = maxVal - (i / 4) * maxVal;
-        ctx.fillStyle = C.text;
-        ctx.font = `11px 'DM Mono', monospace`;
-        ctx.textAlign = 'right';
-        ctx.fillText('₹' + Math.round(val / 1000) + 'K', PAD.left - 8, y + 4);
-      }
-
-      // Bars
-      config.data.forEach((val, i) => {
-        const x      = PAD.left + i * (barW + gap) + gap / 2;
-        const barH   = (val / maxVal) * plotH * progress;
-        const y      = PAD.top + plotH - barH;
-        const color  = config.colors[i] || C.teal;
-        const radius = 6;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + barW - radius, y);
-        ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
-        ctx.lineTo(x + barW, y + barH);
-        ctx.lineTo(x, y + barH);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
-
-        const grad = ctx.createLinearGradient(x, y, x, y + barH);
-        grad.addColorStop(0, hexToRgba(color, 0.9));
-        grad.addColorStop(1, hexToRgba(color, 0.4));
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        // Glow
-        ctx.shadowColor = color;
-        ctx.shadowBlur  = 12;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.restore();
-
-        // Label below
-        ctx.fillStyle = C.text;
-        ctx.font = `10.5px 'Outfit', sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(config.labels[i], x + barW / 2, H - PAD.bottom + 18);
-
-        // Value above bar
-        if (progress > 0.7) {
-          ctx.fillStyle = C.textHi;
-          ctx.font = `bold 11px 'Syne', sans-serif`;
-          ctx.fillText('₹' + Math.round(val / 1000) + 'K', x + barW / 2, y - 8);
-        }
-      });
-    }
-
-    function animate() {
-      prog = Math.min(prog + 0.025, 1);
-      draw(easeOutCubic(prog));
-      if (prog < 1) animFrame = requestAnimationFrame(animate);
-    }
-
-    resize();
-    window.addEventListener('resize', () => { cancelAnimationFrame(animFrame); resize(); prog = 0; animate(); });
-    animate();
-  }
-
-  /** Hex color to rgba string */
-  function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1,3), 16);
-    const g = parseInt(hex.slice(3,5), 16);
-    const b = parseInt(hex.slice(5,7), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-
-  /* -- Data generators -- */
-
-  function historicalData() {
-    const months = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'];
+  let instances = {};
+  
+  function getThemeColors() {
     return {
-      labels: months,
-      datasets: [
-        {
-          label: 'Amazon',
-          color: C.teal,
-          data: [129900,125000,121000,119900,122000,118500,116000,117500,115000,116900,114900,114900]
-        },
-        {
-          label: 'Flipkart',
-          color: C.mint,
-          data: [129900,127000,123000,121500,124000,120000,118000,119500,117000,118500,116499,116499]
-        },
-        {
-          label: 'Croma',
-          color: C.amber,
-          data: [129900,129900,129900,127000,127000,124990,122990,122990,121990,120990,119990,119990]
-        }
-      ]
+      grid: 'rgba(255, 255, 255, 0.1)',
+      text: '#aaa',
+      teal: '#00d4ff',
+      mint: '#00ff9d',
+      amber: '#ffb84d',
+      purple: '#b54dff',
+      coral: '#ff7eb3'
     };
   }
 
-  function predictionData() {
-    const labels = ['Sep','Oct','Nov','Dec','Jan','Feb'];
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Historical',
-          color: C.teal,
-          data: [116900, 114900, null, null, null, null]
-        },
-        {
-          label: 'Predicted',
-          color: C.purple,
-          data: [null, 114900, 106400, 108000, 112000, 110500]
-        }
-      ]
-    };
+  const C = getThemeColors();
+
+  Chart.defaults.color = C.text;
+  Chart.defaults.borderColor = C.grid;
+
+  async function fetchHistory(query) {
+    if (!query) return [];
+    try {
+      const res = await fetch('/api/history?q=' + encodeURIComponent(query));
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
   }
 
-  function comparisonData() {
-    return {
-      labels: ['Amazon', 'Flipkart', 'Apple', 'Croma', 'Vijay Sales', 'Reliance'],
-      data:   [114900, 116499, 129900, 119990, 121000, 123000],
-      colors: [C.teal, C.mint, C.coral, C.amber, C.purple, '#ff9f7f']
-    };
-  }
+  function renderHistoricalChart(data) {
+    const ctx = document.getElementById('historicalChart');
+    if (!ctx) return;
+    
+    if (instances['historicalChart']) {
+        instances['historicalChart'].destroy();
+    }
 
-  function seasonalData() {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return {
-      labels: months,
-      datasets: [
-        {
-          label: 'Avg Price',
-          color: C.teal,
-          data: [119000, 121000, 123000, 124000, 124500, 125000, 120000, 122000, 118000, 113000, 114000, 118000]
+    if (!data || data.length === 0) {
+        return;
+    }
+
+    // Group by website
+    const websites = [...new Set(data.map(d => d.website))];
+    const labels = [...new Set(data.map(d => new Date(d.timestamp).toLocaleDateString()))].sort();
+    
+    const colors = [C.teal, C.mint, C.amber, C.purple, C.coral];
+    
+    const datasets = websites.map((web, idx) => {
+        const webData = data.filter(d => d.website === web);
+        const map = {};
+        webData.forEach(d => {
+            map[new Date(d.timestamp).toLocaleDateString()] = d.price;
+        });
+        
+        return {
+            label: web,
+            data: labels.map(l => map[l] || null),
+            borderColor: colors[idx % colors.length],
+            backgroundColor: colors[idx % colors.length] + '33',
+            borderWidth: 2,
+            tension: 0.4,
+            spanGaps: true
+        };
+    });
+
+    instances['historicalChart'] = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: { color: C.grid }
+                },
+                x: {
+                    grid: { color: C.grid }
+                }
+            }
         }
-      ]
-    };
-  }
-
-  function init() {
-    // Use IntersectionObserver to trigger charts when visible
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        const canvas = entry.target;
-        observer.unobserve(canvas);
-
-        switch (canvas.id) {
-          case 'historicalChart':
-            drawLineChart(canvas, historicalData());
-            break;
-          case 'predictionChart': {
-            const pd = predictionData();
-            // Filter out nulls for each dataset
-            const cleaned = {
-              labels: pd.labels,
-              datasets: pd.datasets.map(ds => ({
-                ...ds,
-                data: ds.data.map(v => v === null ? undefined : v).filter(v => v !== undefined)
-              }))
-            };
-            // Draw historical portion
-            drawLineChart(canvas, {
-              labels: pd.labels,
-              datasets: [
-                { label: 'Historical', color: C.teal,   data: [116900, 114900, 110000, 106400, 108000, 110500] },
-                { label: 'Predicted',  color: C.purple, data: [null,   null,   110000, 106400, 108000, 110500] }
-              ].map(ds => ({ ...ds, data: ds.data.filter(v => v !== null) }))
-            });
-            drawLineChart(canvas, { labels: pd.labels, datasets: [{ label: 'ML Forecast', color: C.purple, data: [116900, 114900, 110000, 106400, 108000, 110500] }] });
-            break;
-          }
-          case 'comparisonChart':
-            drawBarChart(canvas, comparisonData());
-            break;
-          case 'seasonalChart':
-            drawLineChart(canvas, seasonalData());
-            break;
-        }
-      });
-    }, { threshold: 0.2 });
-
-    ['historicalChart','predictionChart','comparisonChart','seasonalChart'].forEach(id => {
-      const canvas = document.getElementById(id);
-      if (canvas) observer.observe(canvas);
     });
   }
 
-  return { init };
-})();
+  function init() {
+    // We will refresh the charts whenever a new search happens via refresh()
+  }
 
+  return { init, fetchHistory, renderHistoricalChart };
+})();
 /* ----------------------------------------------------------------
    8. COUNTER ANIMATIONS MODULE of f
 ---------------------------------------------------------------- */
@@ -918,3 +665,4 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('%cPriceAI v1.0 — Frontend loaded ✅', 'color:#00d4ff;font-family:monospace;font-size:14px;font-weight:bold;');
   console.log('%cReady to connect Flask/FastAPI backend via /api/* endpoints', 'color:#00ff9d;font-family:monospace;font-size:11px;');
 });
+

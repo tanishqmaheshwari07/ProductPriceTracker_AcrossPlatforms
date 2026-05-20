@@ -8,10 +8,9 @@ from app.mock_data import PRODUCT_DATA
 
 class ScraperManager:
     @staticmethod
-    def get_fallback_data(query, existing_stores):
+    def get_fallback_data(query, existing_stores, anchor_price=None):
         """Generate intelligent fallback for stores we couldn't scrape due to bot-protection."""
         results = []
-        base_multiplier = 1.0 + (len(query) % 5) * 0.05
         encoded_q = urllib.parse.quote(query)
         
         for item in PRODUCT_DATA:
@@ -21,11 +20,14 @@ class ScraperManager:
             new_item = dict(item)
             new_item['title'] = query.title() + " " + random.choice(["Edition", "Model", ""]) # Ensure it matches
             
+            base_price = anchor_price if anchor_price else item['price']
+            
             price_variance = random.uniform(0.95, 1.05)
-            new_item['price'] = int(item['price'] * base_multiplier * price_variance)
+            new_item['price'] = int(base_price * price_variance)
             new_item['originalPrice'] = int(new_item['price'] * 1.15)
             new_item['discount'] = int(((new_item['originalPrice'] - new_item['price']) / new_item['originalPrice']) * 100)
             new_item['seller_name'] = f"{item['store']} Official Seller"
+            new_item['base_image_url'] = "https://via.placeholder.com/300x300?text=" + urllib.parse.quote(query)
             
             store_name = new_item['store']
             if store_name == 'Croma':
@@ -63,7 +65,13 @@ class ScraperManager:
         # Existing stores found
         existing_stores = {r['store'] for r in results}
         
-        # Add fallback for missing stores (Croma, Reliance, Vijay Sales)
-        results.extend(ScraperManager.get_fallback_data(query, existing_stores))
+        # Calculate anchor price from scraped results
+        anchor_price = None
+        valid_prices = [r['price'] for r in results if r.get('price')]
+        if valid_prices:
+            anchor_price = sum(valid_prices) / len(valid_prices)
+        
+        # Add fallback for missing stores (Croma, Reliance)
+        results.extend(ScraperManager.get_fallback_data(query, existing_stores, anchor_price))
         
         return results

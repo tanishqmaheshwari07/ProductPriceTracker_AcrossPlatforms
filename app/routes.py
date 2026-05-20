@@ -27,40 +27,50 @@ def get_products():
     # 1. Scrape data
     raw_results = ScraperManager.search_all(query)
     
-    # 2. Filter lowest price per store
-    final_results = process_scraped_data(raw_results)
+    # 2. Get or create product and calculate trend
+    norm_title = query.lower() # simplify normalization for DB
+    prod = Product.query.filter_by(normalized_title=norm_title).first()
     
-    # 3. Store in DB
+    trend_data = None
+    if prod:
+        from app.analytics.trend_analysis import TrendAnalyzer
+        trend_data = TrendAnalyzer.analyze_product_trend(prod.id)
+    
+    # 3. Process scraped data with trend context
+    final_results = process_scraped_data(raw_results, query, trend_data)
+    
+    # 4. Store new snapshot in DB
     try:
-        # Get or create product
-        norm_title = query.lower() # simplify normalization for DB
-        prod = Product.query.filter_by(normalized_title=norm_title).first()
         if not prod:
             prod = Product(title=query, normalized_title=norm_title)
             db.session.add(prod)
             db.session.commit()
             
         # Add history
-        for item in final_results:
-            hist = PriceHistory(
-                product_id=prod.id,
-                website=item['store'],
-                seller_name=item.get('seller_name', ''),
-                price=item['price'],
-                original_price=item.get('originalPrice'),
-                discount=item.get('discount', 0),
-                rating=item.get('rating'),
-                review_count=item.get('reviewCount', 0),
-                availability=item.get('availability'),
-                buy_url=item.get('buyUrl', '#')
-            )
-            db.session.add(hist)
+        for variant in final_results:
+            for store, store_data in variant['platforms'].items():
+                hist = PriceHistory(
+                    product_id=prod.id,
+                    website=store,
+                    seller_name=store_data['cheapest_seller_name'],
+                    price=store_data['lowest_price'],
+                    original_price=store_data['lowest_price'], # Simplification for now
+                    discount=0,
+                    rating=4.5,
+                    review_count=1000,
+                    availability="In Stock",
+                    buy_url=store_data['direct_seller_link']
+                )
+                db.session.add(hist)
         db.session.commit()
     except Exception as e:
         print("DB Error:", e)
         db.session.rollback()
 
-    return jsonify(final_results)
+    return jsonify({
+        "search_query": query,
+        "results": final_results
+    })
 
 @main_bp.route('/api/history', methods=['GET'])
 def get_history():

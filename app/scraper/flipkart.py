@@ -17,52 +17,82 @@ class FlipkartScraper(BaseScraper):
                 return results
                 
             soup = BeautifulSoup(response.text, 'html.parser')
-            # Flipkart uses dynamic classes, but we can look for main containers
-            # Let's extract prices and titles where we can
             
-            # Simple heuristic: title divs usually have class like _4rR01T or similar length strings
-            title_elems = soup.find_all('div', class_=lambda c: c and len(c) == 7 and '_' in c)
-            if not title_elems:
-                title_elems = soup.find_all('a', class_=lambda c: c and 's1Q9rs' in c)
+            # Find all anchor tags that look like product links
+            a_tags = soup.find_all('a', href=True)
+            
+            seen_urls = set()
+            
+            for a in a_tags:
+                href = a['href']
+                if not href.startswith('/'):
+                    continue
+                    
+                text_content = a.get_text(separator=' | ').strip()
+                if not text_content or len(text_content) < 20 or '₹' not in text_content:
+                    continue
                 
-            for title_elem in title_elems[:10]:
-                title = title_elem.text.strip()
-                if not title or len(title) < 5: continue
-                
+                # Try to extract a title from the first part of the text or an img alt tag
+                title = ""
+                img = a.find('img')
+                if img and img.has_attr('alt') and len(img['alt']) > 5:
+                    title = img['alt']
+                else:
+                    # Fallback to the first segment of text
+                    segments = [s.strip() for s in text_content.split('|') if s.strip()]
+                    if segments:
+                        # Find the longest segment that doesn't contain a rupee symbol (likely the title)
+                        title_cands = [s for s in segments if '₹' not in s and len(s) > 10]
+                        if title_cands:
+                            title = max(title_cands, key=len)
+                        else:
+                            title = segments[0]
+                            
+                if not title:
+                    continue
+                    
+                # Match against query
                 is_match, score = RuleBasedMatcher.is_match(query, title)
                 if not is_match:
                     continue
                     
-                # Walk up to find price container
-                parent = title_elem.find_parent('div', class_=lambda c: c and '_' in c)
-                while parent and not parent.find('div', string=lambda text: text and '₹' in text and len(text) < 15):
-                    parent = parent.find_parent('div')
+                # Extract Price
+                price_segments = [s for s in text_content.split('|') if '₹' in s]
+                if not price_segments:
+                    continue
                     
-                if not parent: continue
-                
-                price_elem = parent.find('div', string=lambda text: text and '₹' in text and len(text) < 15)
-                if not price_elem: continue
-                
-                price = self.parse_price(price_elem.text)
+                # The first one is usually the current price
+                price = self.parse_price(price_segments[0])
                 if price == 0: continue
                 
-                orig_price = int(price * 1.1) # Fallback 10% mock if not found
-                discount = 10
+                orig_price = price
+                if len(price_segments) > 1:
+                    orig = self.parse_price(price_segments[1])
+                    if orig > price:
+                        orig_price = orig
                 
-                # Attempt to find the exact product link
-                product_url = url
-                a_tag = title_elem if title_elem.name == 'a' else title_elem.find_parent('a')
-                if not a_tag and parent:
-                    a_tag = parent.find_parent('a') or parent.find('a')
+                if orig_price == price:
+                    orig_price = int(price * 1.1)
                     
-                if a_tag and a_tag.has_attr('href'):
-                    product_url = "https://www.flipkart.com" + a_tag['href']
+                discount = int(((orig_price - price) / orig_price) * 100) if orig_price > 0 else 0
+                
+                product_url = "https://www.flipkart.com" + href.split('?')[0] + "?pid=" + urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get('pid', [''])[0] if 'pid=' in href else "https://www.flipkart.com" + href
+                
+                if product_url in seen_urls:
+                    continue
+                seen_urls.add(product_url)
+                
+                # Image URL
+                image_url = ""
+                if img and img.has_attr('src') and img['src'].startswith('http'):
+                    image_url = img['src']
 
                 results.append({
                     "id": f"flp_{int(time.time())}_{random.randint(100,999)}",
                     "title": title,
+                    "base_image_url": image_url,
                     "store": "Flipkart",
-                    "seller_name": "Flipkart Assured",
+                    "seller_name": "Flipkart Assured", # Can be extracted more specifically if needed
                     "emoji": "🏪",
                     "price": price,
                     "originalPrice": orig_price,
@@ -72,6 +102,10 @@ class FlipkartScraper(BaseScraper):
                     "availability": "In Stock",
                     "buyUrl": product_url
                 })
+                
+                if len(results) >= 15: # Grab top 15 results for multi-seller backlog
+                    break
+                    
         except Exception as e:
             print(f"Flipkart Scraper Error: {e}")
             

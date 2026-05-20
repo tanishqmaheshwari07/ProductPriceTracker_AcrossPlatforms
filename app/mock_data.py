@@ -77,25 +77,7 @@ PRODUCT_DATA = [
         "isBestDeal": False,
         "buyUrl": "#"
     },
-    {
-        "id": 5,
-        "store": "Vijay Sales",
-        "emoji": "🔌",
-        "storeType": "Electronics Chain",
-        "price": 121000,
-        "originalPrice": 129900,
-        "discount": 7,
-        "rating": 4.2,
-        "reviewCount": 1894,
-        "delivery": "Free delivery in 4–5 days",
-        "cashback": None,
-        "availability": "In Stock",
-        "trend": "up",
-        "trendText": "↑ 0.5% this week",
-        "badges": [],
-        "isBestDeal": False,
-        "buyUrl": "#"
-    },
+
     {
         "id": 6,
         "store": "Reliance Digital",

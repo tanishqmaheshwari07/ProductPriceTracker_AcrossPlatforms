@@ -19,7 +19,7 @@ class AmazonScraper(BaseScraper):
             soup = BeautifulSoup(response.text, 'html.parser')
             products = soup.find_all('div', {'data-component-type': 's-search-result'})
             
-            for product in products[:5]: # Parse top 5 to find best match
+            for product in products[:15]: # Parse top 15 to find variants and sellers
                 title_elem = product.find('h2', class_='a-size-medium') or product.find('span', class_='a-text-normal')
                 if not title_elem: continue
                 
@@ -54,12 +54,19 @@ class AmazonScraper(BaseScraper):
                     else:
                         buy_url = "https://www.amazon.in" + href
                 
+                # Extract image
+                img_url = ""
+                img_elem = product.find('img', class_='s-image')
+                if img_elem and img_elem.has_attr('src'):
+                    img_url = img_elem['src']
+                
                 # Seller info usually requires a secondary request on Amazon, so we mock it dynamically or leave it as "Amazon"
                 seller_name = "Amazon Retail" if "Amazon" in title else "Verified Seller"
 
                 results.append({
                     "id": f"amz_{int(time.time())}_{random.randint(100,999)}",
                     "title": title, # Keep exact title scraped
+                    "base_image_url": img_url,
                     "store": "Amazon",
                     "seller_name": seller_name,
                     "emoji": "🛒",
