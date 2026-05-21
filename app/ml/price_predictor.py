@@ -57,6 +57,10 @@ class PricePredictor:
         future_days_offsets = [7, 14, 21, 30]
         future_days = np.array([last_day + d for d in future_days_offsets]).reshape(-1, 1)
         
+
+        rf_preds = self.rf_model.predict(future_days)
+        lr_preds = self.lr_model.predict(future_days)
+
         # Blend Random Forest and Linear Regression
         # If trend_slope was zeroed out, lr_preds would just be the mean or wildly off intercept.
         # It's safer to rely mostly on Random Forest if we have no real time span.
@@ -150,3 +154,7 @@ class PricePredictor:
         
         # Boost confidence for robust cases
         return min(max(conf, 10.0), 98.5)
+
+
+
+

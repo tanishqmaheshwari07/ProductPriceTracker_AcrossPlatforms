@@ -1,8 +1,9 @@
-from app import create_app
 import os
+from app import create_app
 
 app = create_app()
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+if __name__ == '__main__':
+    # FIX #6: debug and port were hardcoded — now read from config/env
+    port = int(os.getenv('PORT', 5000))
+    app.run(debug=app.config.get('DEBUG', False), port=port)
