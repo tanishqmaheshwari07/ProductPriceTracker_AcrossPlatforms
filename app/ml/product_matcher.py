@@ -2,7 +2,6 @@ import re
 import logging
 from rapidfuzz import fuzz
 import numpy as np
-from sentence_transformers import SentenceTransformer, util
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO)
@@ -26,11 +25,14 @@ class ProductMatcher:
         self.embedding_cache = {}
         # Load lightweight semantic model
         try:
+            from sentence_transformers import SentenceTransformer, util
+            self.util = util
             self.model = SentenceTransformer('all-MiniLM-L6-v2')
             logger.info("SentenceTransformer model loaded successfully.")
         except Exception as e:
-            logger.error(f"Failed to load SentenceTransformer: {e}")
+            logger.error(f"Failed to load SentenceTransformer (falling back to pure fuzzy matching): {e}")
             self.model = None
+            self.util = None
 
         # Weights for the hybrid score
         self.FUZZY_WEIGHT = 0.4
@@ -88,7 +90,7 @@ class ProductMatcher:
         emb1 = self.get_embedding(title1)
         emb2 = self.get_embedding(title2)
         
-        cosine_score = util.cos_sim(emb1, emb2).item()
+        cosine_score = self.util.cos_sim(emb1, emb2).item()
         # Convert cosine similarity (typically -1 to 1) to a 0-100 scale.
         # Since these are product titles, scores usually range 0 to 1 anyway.
         normalized_score = max(0, min(100, cosine_score * 100))

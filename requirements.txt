@@ -3,10 +3,15 @@ python-dotenv==1.0.0
 requests==2.31.0
 beautifulsoup4==4.12.3
 Flask-SQLAlchemy==3.1.1
-SQLAlchemy==2.0.25
+SQLAlchemy>=2.0.43
 rapidfuzz==3.6.1
 
-# FIX #7: AI SDK packages were missing — app crashed with ModuleNotFoundError
+# ML & NLP dependencies
+pandas
+scikit-learn
+sentence-transformers
+
+# Google Gemini SDK
 google-generativeai==0.7.2
-openai==1.35.3
-anthropic==0.29.0
+
+

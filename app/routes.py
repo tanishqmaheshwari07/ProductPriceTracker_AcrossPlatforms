@@ -24,7 +24,16 @@ def get_products():
     if not query:
         # Default behavior or empty
         from app.mock_data import PRODUCT_DATA
-        return jsonify(PRODUCT_DATA)
+        mock_results = []
+        for item in PRODUCT_DATA:
+            new_item = dict(item)
+            new_item['title'] = "iPhone 16 Pro 256GB"
+            mock_results.append(new_item)
+        final_results = process_scraped_data(mock_results, "iPhone 16 Pro")
+        return jsonify({
+            "search_query": "iPhone 16 Pro",
+            "results": final_results
+        })
         
     # 1. Scrape data
     raw_results = ScraperManager.search_all(query)
