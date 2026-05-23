@@ -110,3 +110,171 @@ class RecommendationEngine:
         # Return the winning platform name
         best_platform = ranked[0]['platform'] if ranked else None
         return best_platform
+
+    @staticmethod
+    def get_personalized_recommendations(user_id):
+        """
+        Generates personalized recommendations based on user activities, 
+        watchlist, preferences, and deal scores.
+        """
+        from app.database.models import User, UserPreferences, UserActivity, Product, PriceHistory
+        import json
+        
+        user = User.query.get(user_id)
+        if not user:
+            return RecommendationEngine.get_trending_deals()
+            
+        # Try to load user preferences
+        pref_categories = []
+        pref_brands = []
+        budget_max = None
+        
+        if user.preferences:
+            pref_categories = json.loads(user.preferences.category_preferences) if user.preferences.category_preferences else []
+            pref_brands = json.loads(user.preferences.brand_preferences) if user.preferences.brand_preferences else []
+            budget_max = user.preferences.budget_max
+            
+        # Get user's recent search/view activity to extract brand/category hints
+        recent_activities = UserActivity.query.filter_by(user_id=user_id)\
+            .order_by(UserActivity.timestamp.desc()).limit(10).all()
+            
+        for act in recent_activities:
+            if act.activity_type == 'search' and act.details:
+                query = act.details.lower()
+                if 'iphone' in query or 'apple' in query:
+                    pref_brands.append('apple')
+                if 'samsung' in query:
+                    pref_brands.append('samsung')
+                if 'sony' in query:
+                    pref_brands.append('sony')
+                if 'tv' in query or 'television' in query:
+                    pref_categories.append('tv')
+                if 'phone' in query or 'mobile' in query:
+                    pref_categories.append('smartphones')
+                    
+        # Make lists unique and lowercase
+        pref_categories = list(set([c.lower() for c in pref_categories]))
+        pref_brands = list(set([b.lower() for b in pref_brands]))
+        
+        # Query products
+        query = Product.query
+        
+        # Build filters
+        if pref_brands and pref_categories:
+            query = query.filter((Product.brand.in_(pref_brands)) | (Product.category.in_(pref_categories)))
+        elif pref_brands:
+            query = query.filter(Product.brand.in_(pref_brands))
+        elif pref_categories:
+            query = query.filter(Product.category.in_(pref_categories))
+            
+        products = query.limit(20).all()
+        
+        # If no preferred products, fall back to all products
+        if not products:
+            products = Product.query.limit(20).all()
+            
+        # Calculate scores and sort
+        recommendations = []
+        for prod in products:
+            # Get latest price histories
+            histories = PriceHistory.query.filter_by(product_id=prod.id)\
+                .order_by(PriceHistory.timestamp.desc()).all()
+                
+            if not histories:
+                continue
+                
+            # Keep only the latest entry per website
+            latest_by_website = {}
+            for h in histories:
+                if h.website not in latest_by_website or h.timestamp > latest_by_website[h.website].timestamp:
+                    latest_by_website[h.website] = h
+                    
+            if not latest_by_website:
+                continue
+                
+            # Build platforms_data structure
+            platforms_data = {}
+            for web, h in latest_by_website.items():
+                platforms_data[web] = {
+                    'lowest_price': h.price,
+                    'original_price': h.original_price or h.price,
+                    'cheapest_seller_name': h.seller_name or 'Seller',
+                    'direct_seller_link': h.buy_url,
+                    'match_confidence': 90, 
+                }
+                
+            # Run ranking
+            from app.analytics.trend_analysis import TrendAnalyzer
+            trend_data = TrendAnalyzer.analyze_product_trend(prod.id)
+            
+            best_platform = RecommendationEngine.rank_platforms(platforms_data, trend_data)
+            if best_platform and best_platform in platforms_data:
+                best_data = platforms_data[best_platform]
+                
+                # Check budget constraints
+                if budget_max and best_data['lowest_price'] > budget_max:
+                    continue
+                    
+                recommendations.append({
+                    'product_id': prod.id,
+                    'title': prod.title,
+                    'brand': prod.brand or 'Generic',
+                    'category': prod.category or 'Electronics',
+                    'price': best_data['lowest_price'],
+                    'original_price': best_data['original_price'],
+                    'store': best_platform,
+                    'buy_url': best_data['direct_seller_link'],
+                    'deal_score': best_data['recommendation']['deal_score'],
+                    'badge': best_data['recommendation']['badge'],
+                    'reasons': best_data['recommendation']['reasons']
+                })
+                
+        # Sort by deal_score descending
+        recommendations.sort(key=lambda x: x['deal_score'], reverse=True)
+        return recommendations[:4]
+
+    @staticmethod
+    def get_trending_deals():
+        """
+        Returns highest-scoring deals globally from the system.
+        """
+        from app.database.models import Product, PriceHistory
+        products = Product.query.limit(10).all()
+        deals = []
+        for prod in products:
+            histories = PriceHistory.query.filter_by(product_id=prod.id)\
+                .order_by(PriceHistory.timestamp.desc()).all()
+            if not histories:
+                continue
+            latest_by_website = {}
+            for h in histories:
+                if h.website not in latest_by_website or h.timestamp > latest_by_website[h.website].timestamp:
+                    latest_by_website[h.website] = h
+            platforms_data = {}
+            for web, h in latest_by_website.items():
+                platforms_data[web] = {
+                    'lowest_price': h.price,
+                    'original_price': h.original_price or h.price,
+                    'cheapest_seller_name': h.seller_name or 'Seller',
+                    'direct_seller_link': h.buy_url,
+                    'match_confidence': 90,
+                }
+            best_platform = RecommendationEngine.rank_platforms(platforms_data, None)
+            if best_platform and best_platform in platforms_data:
+                best_data = platforms_data[best_platform]
+                deals.append({
+                    'product_id': prod.id,
+                    'title': prod.title,
+                    'brand': prod.brand or 'Generic',
+                    'category': prod.category or 'Electronics',
+                    'price': best_data['lowest_price'],
+                    'original_price': best_data['original_price'],
+                    'store': best_platform,
+                    'buy_url': best_data['direct_seller_link'],
+                    'deal_score': best_data['recommendation']['deal_score'],
+                    'badge': best_data['recommendation']['badge'],
+                    'reasons': best_data['recommendation']['reasons']
+                })
+        deals.sort(key=lambda x: x['deal_score'], reverse=True)
+        return deals[:4]
+

@@ -84,10 +84,10 @@
             </button>
 
             <div class="user-chip" id="userChip" role="button" tabindex="0" aria-label="User menu">
-                <div class="user-avatar">AK</div>
+                <div class="user-avatar" id="userAvatar">G</div>
                 <div class="user-meta">
-                    <span class="user-name">Arjun Kumar</span>
-                    <span class="user-plan">Pro Plan</span>
+                    <span class="user-name" id="userName">Guest User</span>
+                    <span class="user-plan" id="userPlan">Sign In / Register</span>
                 </div>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                     <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -137,12 +137,12 @@
                             <span class="sl">Compare</span>
                         </a>
 
-                        <a href="#" class="sidebar-item" data-tooltip="Saved Products">
+                        <a href="#watchlist" class="sidebar-item" id="watchlistSidebarItem" data-tooltip="Saved Products">
                             <svg class="si" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
-                            <span class="sl">Saved</span>
-                            <span class="sidebar-count">12</span>
+                            <span class="sl">Watchlist</span>
+                            <span class="sidebar-count" id="watchlistSidebarCount">0</span>
                         </a>
 
                         <a href="#alerts" class="sidebar-item" data-tooltip="Price Alerts">
@@ -292,6 +292,18 @@
                         <p class="chat-input-disclaimer">
                             Search across 50+ stores to find the absolute best deal.
                         </p>
+                    </div>
+                    
+                    <!-- Personalized Recommendations Feed -->
+                    <div class="rec-feed-container" id="recFeedContainer" style="display: none; margin-top: 30px;">
+                        <div class="rec-feed-header">
+                            <h3 class="rec-feed-title" style="margin: 0 0 15px 0;">
+                                <span style="font-size: 1.25rem;">✨</span> For You — AI Personalized recommendations
+                            </h3>
+                        </div>
+                        <div class="rec-grid" id="recGrid">
+                            <!-- Rendered by app.js -->
+                        </div>
                     </div>
                 </div>
             </section>
@@ -576,6 +588,46 @@
                 </div>
             </section>
 
+            <!-- ========================================================
+                 SECTION 6 — Watchlist System
+            ======================================================== -->
+            <section class="section" id="watchlist">
+                <div class="section-header">
+                    <div class="section-header-left">
+                        <div class="section-tag">Saved Products</div>
+                        <h2 class="section-heading">Smart Watchlist</h2>
+                        <p class="section-desc">Tracked products and target price notifications</p>
+                    </div>
+                </div>
+                
+                <!-- Watchlist Analytics mini-panel -->
+                <div class="metrics-grid" style="margin-bottom: 24px;">
+                    <div class="metric-card glass-card">
+                        <div class="mc-icon teal">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        </div>
+                        <div class="mc-body">
+                            <span class="mc-label">Estimated Watchlist Savings</span>
+                            <span class="mc-value" id="wlPotentialSavings">₹0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card glass-card">
+                        <div class="mc-icon mint">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2"/></svg>
+                        </div>
+                        <div class="mc-body">
+                            <span class="mc-label">Active Tracked Items</span>
+                            <span class="mc-value" id="wlTrackedCount">0 Items</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="products-grid" id="watchlistGrid">
+                    <p style="color: #aaa; padding: 20px; grid-column: 1/-1; text-align: center;">Sign in to view and manage your watchlist.</p>
+                </div>
+            </section>
+
+
         </main><!-- /main-content -->
     </div><!-- /app-layout -->
 
@@ -647,6 +699,63 @@
             </span>
         </div>
     </footer>
+
+    <!-- ================================================================
+         AUTH MODAL (LOGIN / REGISTER)
+    ================================================================ -->
+    <div class="auth-modal-overlay" id="authModalOverlay" style="display: none;">
+        <div class="auth-modal glass-card">
+            <button class="auth-modal-close" id="authCloseBtn" aria-label="Close">×</button>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLoginBtn">Login</button>
+                <button class="auth-tab" id="tabRegisterBtn">Register</button>
+            </div>
+            
+            <form id="loginForm" class="auth-form">
+                <h3 class="auth-title">Welcome Back</h3>
+                <p class="auth-subtitle">Sign in to track products & receive price drop notifications.</p>
+                
+                <div class="form-group">
+                    <label for="loginEmail">Email Address</label>
+                    <input type="email" id="loginEmail" placeholder="you@example.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required>
+                </div>
+                
+                <div class="auth-error-msg" id="loginErrorMsg"></div>
+                
+                <button type="submit" class="btn btn-primary auth-submit-btn">Sign In</button>
+            </form>
+            
+            <form id="registerForm" class="auth-form" style="display: none;">
+                <h3 class="auth-title">Create Account</h3>
+                <p class="auth-subtitle">Unlock personalized recommendations & smart price alerts.</p>
+                
+                <div class="form-group">
+                    <label for="registerName">Full Name</label>
+                    <input type="text" id="registerName" placeholder="Arjun Kumar" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="registerEmail">Email Address</label>
+                    <input type="email" id="registerEmail" placeholder="you@example.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" placeholder="••••••••" minlength="6" required>
+                </div>
+                
+                <div class="auth-error-msg" id="registerErrorMsg"></div>
+                
+                <button type="submit" class="btn btn-primary auth-submit-btn">Create Account</button>
+            </form>
+        </div>
+    </div>
 
     <!-- App JavaScript -->
     <script src="/static/js/app.js"></script>

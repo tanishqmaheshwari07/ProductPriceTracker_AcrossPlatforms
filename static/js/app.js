@@ -84,6 +84,355 @@ function animateCounter(el, target, duration = 1200) {
 /* ----------------------------------------------------------------
    3. SIDEBAR MODULE
 ---------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   2.5. PHASE 4 FRONTEND MODULES (Auth, Watchlist, recommendations)
+---------------------------------------------------------------- */
+const Auth = (() => {
+  const overlay = document.getElementById('authModalOverlay');
+  const closeBtn = document.getElementById('authCloseBtn');
+  const userChip = document.getElementById('userChip');
+  
+  const tabLoginBtn = document.getElementById('tabLoginBtn');
+  const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+  
+  const loginErrorMsg = document.getElementById('loginErrorMsg');
+  const registerErrorMsg = document.getElementById('registerErrorMsg');
+  
+  const userNameEl = document.getElementById('userName');
+  const userPlanEl = document.getElementById('userPlan');
+  const userAvatarEl = document.getElementById('userAvatar');
+  
+  let userObject = null;
+
+  function showModal() {
+    overlay.style.display = 'flex';
+    switchTab('login');
+  }
+
+  function hideModal() {
+    overlay.style.display = 'none';
+  }
+
+  function switchTab(tab) {
+    if (tab === 'login') {
+      tabLoginBtn.classList.add('active');
+      tabRegisterBtn.classList.remove('active');
+      loginForm.style.display = 'flex';
+      registerForm.style.display = 'none';
+    } else {
+      tabLoginBtn.classList.remove('active');
+      tabRegisterBtn.classList.add('active');
+      loginForm.style.display = 'none';
+      registerForm.style.display = 'flex';
+    }
+  }
+
+  async function checkStatus() {
+    try {
+      const res = await fetch('/api/auth/status');
+      const data = await res.json();
+      if (data.authenticated) {
+        userObject = data.user;
+        userNameEl.textContent = userObject.name || userObject.email;
+        userPlanEl.textContent = userObject.plan || 'Free Plan';
+        userAvatarEl.textContent = (userObject.name || userObject.email).substring(0, 2).toUpperCase();
+        
+        document.getElementById('recFeedContainer').style.display = 'block';
+        PersonalizedRecommendations.load();
+        WatchlistModule.load();
+      } else {
+        userObject = null;
+        userNameEl.textContent = 'Guest User';
+        userPlanEl.textContent = 'Sign In / Register';
+        userAvatarEl.textContent = 'G';
+        document.getElementById('recFeedContainer').style.display = 'none';
+        document.getElementById('watchlistGrid').innerHTML = `
+          <p style="color: #aaa; padding: 20px; grid-column: 1/-1; text-align: center;">Sign in to view and manage your watchlist.</p>
+        `;
+        const countBadge = document.getElementById('watchlistSidebarCount');
+        if (countBadge) countBadge.textContent = '0';
+        const trackedCount = document.getElementById('wlTrackedCount');
+        if (trackedCount) trackedCount.textContent = '0 Items';
+        const savingsEl = document.getElementById('wlPotentialSavings');
+        if (savingsEl) savingsEl.textContent = '₹0';
+      }
+    } catch (e) {
+      console.error("Auth status check failed:", e);
+    }
+  }
+
+  function init() {
+    if (userChip) {
+      userChip.addEventListener('click', () => {
+        if (!userObject) {
+          showModal();
+        } else {
+          if (confirm("Do you want to log out?")) {
+            logout();
+          }
+        }
+      });
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', hideModal);
+    if (tabLoginBtn) tabLoginBtn.addEventListener('click', () => switchTab('login'));
+    if (tabRegisterBtn) tabRegisterBtn.addEventListener('click', () => switchTab('register'));
+
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        loginErrorMsg.textContent = '';
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            hideModal();
+            await checkStatus();
+            Products.refresh(); 
+          } else {
+            loginErrorMsg.textContent = data.error || 'Login failed';
+          }
+        } catch (e) {
+          loginErrorMsg.textContent = 'Server error. Please try again.';
+        }
+      });
+    }
+
+    if (registerForm) {
+      registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        registerErrorMsg.textContent = '';
+        const name = document.getElementById('registerName').value;
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            const loginRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password })
+            });
+            if (loginRes.ok) {
+              hideModal();
+              await checkStatus();
+              Products.refresh();
+            } else {
+              switchTab('login');
+              loginErrorMsg.textContent = 'Account created! Please sign in.';
+            }
+          } else {
+            registerErrorMsg.textContent = data.error || 'Registration failed';
+          }
+        } catch (e) {
+          registerErrorMsg.textContent = 'Server error. Please try again.';
+        }
+      });
+    }
+  }
+
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await checkStatus();
+      Products.refresh();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  return { init, checkStatus, isAuthenticated: () => !!userObject, showModal };
+})();
+
+const WatchlistModule = (() => {
+  const grid = document.getElementById('watchlistGrid');
+  const countBadge = document.getElementById('watchlistSidebarCount');
+  
+  async function load() {
+    if (!Auth.isAuthenticated()) return;
+    try {
+      const res = await fetch('/api/watchlist');
+      const data = await res.json();
+      
+      if (countBadge) countBadge.textContent = data.length;
+      
+      const trackedCount = document.getElementById('wlTrackedCount');
+      if (trackedCount) trackedCount.textContent = `${data.length} Items`;
+      
+      loadAnalytics();
+      render(data);
+    } catch (e) {
+      console.error("Watchlist loading failed:", e);
+    }
+  }
+
+  async function loadAnalytics() {
+    try {
+      const res = await fetch('/api/analytics/dashboard');
+      const data = await res.json();
+      const savingsEl = document.getElementById('wlPotentialSavings');
+      if (savingsEl) {
+        savingsEl.textContent = `₹${formatINR(data.potential_savings)}`;
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  function render(items) {
+    if (!grid) return;
+    if (items.length === 0) {
+      grid.innerHTML = `
+        <p style="color: #aaa; padding: 40px; grid-column: 1/-1; text-align: center;">
+          Your watchlist is empty. Search for products and click <strong>Watch</strong> to add them here!
+        </p>
+      `;
+      return;
+    }
+
+    grid.innerHTML = items.map((item, idx) => {
+      const p = item.product;
+      const target = item.target_price ? `₹${formatINR(item.target_price)}` : 'Any Price Drop';
+      const current = item.current_price ? `₹${formatINR(item.current_price)}` : 'N/A';
+      
+      let priceDiffHtml = '';
+      if (item.current_price && item.target_price && item.current_price > item.target_price) {
+        const diff = item.current_price - item.target_price;
+        priceDiffHtml = `<div style="font-size: 0.75rem; color: #ffb84d; margin-top: 4px;">₹${formatINR(diff)} above target</div>`;
+      } else if (item.current_price && item.target_price && item.current_price <= item.target_price) {
+        priceDiffHtml = `<div style="font-size: 0.75rem; color: #00ff9d; margin-top: 4px;">Target reached! 📉</div>`;
+      }
+
+      return `
+        <div class="product-card" style="animation-delay:${idx * 0.08}s; display: flex; flex-direction: column;">
+          <div class="pc-store-name" style="font-size: 1.1rem; line-height: 1.3;">${p.title}</div>
+          <div style="font-size: 0.8rem; color: #aaa; margin: 5px 0;">Platform: <strong>${item.website}</strong></div>
+          
+          <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+            <div>
+              <div style="font-size: 0.7rem; color: #aaa;">CURRENT PRICE</div>
+              <div style="font-size: 1.25rem; font-weight: 800; color: #00ff9d;">${current}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.7rem; color: #aaa;">TARGET PRICE</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #00d4ff;">${target}</div>
+            </div>
+          </div>
+          ${priceDiffHtml}
+          
+          <button class="pc-cta" style="margin-top: 15px; background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.3); color: #ff6b6b;" onclick="WatchlistModule.remove(${item.id})">Remove From Watchlist</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function add(prodId, title, targetVal) {
+    if (!Auth.isAuthenticated()) {
+      Auth.showModal();
+      return;
+    }
+    const targetPrice = targetVal ? parseInt(targetVal, 10) : null;
+    try {
+      const res = await fetch('/api/watchlist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: prodId,
+          product_title: title,
+          target_price: targetPrice
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        load();
+      } else {
+        alert(data.error || 'Failed to watchlist product');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function remove(watchlistId) {
+    if (!confirm("Are you sure you want to remove this product?")) return;
+    try {
+      const res = await fetch(`/api/watchlist/remove/${watchlistId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        load();
+      } else {
+        alert('Failed to remove item');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  return { load, add, remove };
+})();
+
+const PersonalizedRecommendations = (() => {
+  const grid = document.getElementById('recGrid');
+  
+  async function load() {
+    try {
+      const res = await fetch('/api/recommendations');
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      console.error("Failed to load recommendations:", e);
+    }
+  }
+
+  function render(recs) {
+    if (!grid) return;
+    if (recs.length === 0) {
+      grid.innerHTML = '<p style="color: #aaa; padding: 20px; text-align: center; grid-column: 1/-1;">Analyzing your shopping interests to generate personalized deals...</p>';
+      return;
+    }
+    
+    grid.innerHTML = recs.map((r, idx) => {
+      return `
+        <div class="product-card" style="animation-delay:${idx * 0.08}s; display: flex; flex-direction: column;">
+          <div class="pc-top">
+            <div style="background: linear-gradient(90deg, #ff007a, #7928ca); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">
+              ${r.badge} (Score: ${r.deal_score})
+            </div>
+          </div>
+          <div class="pc-store-name" style="font-size: 1rem; font-weight: bold; margin-top: 10px;">${r.title}</div>
+          <div style="font-size: 0.8rem; color: #aaa; margin: 4px 0;">Category: ${r.category} · Brand: ${r.brand}</div>
+          
+          <div class="pc-price-row" style="margin-top: auto; padding-top: 10px;">
+            <div class="pc-price"><span class="currency">₹</span>${formatINR(r.price)}</div>
+            ${r.original_price > r.price ? `<div class="pc-orig-price">₹${formatINR(r.original_price)}</div>` : ''}
+          </div>
+          
+          <button class="pc-cta" onclick="window.open('${r.buy_url}','_blank')" style="margin-top: 12px; background: linear-gradient(135deg, var(--teal), #0090c0); color: #000; font-weight: bold;">Buy on ${r.store.charAt(0).toUpperCase() + r.store.slice(1)}</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  return { load };
+})();
+
 const Sidebar = (() => {
   const sidebar      = document.getElementById('sidebar');
   const toggleBtn    = document.getElementById('sidebarToggle');
@@ -285,6 +634,18 @@ const Products = (() => {
         
         <button class="pc-cta" onclick="window.open('${absoluteLowest.direct_seller_link}','_blank')" style="margin-top: 15px;">${ctaText}</button>
         
+        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+          ${Auth.isAuthenticated() 
+            ? `
+              <div class="wl-target-input-wrap">
+                <input type="number" class="wl-target-input" placeholder="Target Price (₹)" id="targetPrice-${index}">
+                <button class="wl-save-btn" onclick="WatchlistModule.add(${p.product_id || 'null'}, '${p.product_title.replace(/'/g, "\\'")}', document.getElementById('targetPrice-${index}').value)">Watch</button>
+              </div>
+            `
+            : `<button class="wl-save-btn" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.05); color: #aaa;" onclick="Auth.showModal()">Login to Watch</button>`
+          }
+        </div>
+        
         <details style="margin-top: 10px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
           <summary style="font-size: 0.85rem; color: #aaa; outline: none;">View All Sellers (${p.platforms[absoluteStore].all_sellers_backlog.length}+)</summary>
           <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; max-height: 200px; overflow-y: auto;">
@@ -295,20 +656,53 @@ const Products = (() => {
     `;
   }
 
-  /** Render all product cards */
+  /** Render all product cards, with a proper empty-state message */
   function render(data) {
+    /*
+     * BUG FIX: Previously, when the API returned an empty results array the
+     * grid just went blank — no feedback to the user at all.
+     *
+     * Two empty cases are handled separately:
+     *   1. No query typed yet  → prompt the user to search.
+     *   2. Query returned 0 results  → tell the user nothing was found.
+     */
+    if (!data || data.length === 0) {
+      const noQuery = !currentQuery;
+      grid.innerHTML = `
+        <div style="
+          grid-column: 1 / -1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 20px;
+          text-align: center;
+          color: #aaa;
+        ">
+          <div style="font-size: 3rem; margin-bottom: 16px;">${noQuery ? '🔍' : '😕'}</div>
+          <h3 style="font-size: 1.3rem; color: #fff; margin-bottom: 8px;">
+            ${noQuery ? 'Search for any product' : 'No results found'}
+          </h3>
+          <p style="font-size: 0.95rem; max-width: 400px; line-height: 1.6;">
+            ${noQuery
+              ? 'Type a product name in the search bar above — e.g. <em>"wireless earbuds"</em>, <em>"Samsung TV"</em>, or <em>"iPhone 16"</em> — and we\'ll compare prices across Amazon, Flipkart, Croma, and more.'
+              : `We couldn't find any matching listings for <strong style="color:#fff;">"${currentQuery}"</strong>. Try a shorter or different search term.`
+            }
+          </p>
+        </div>
+      `;
+      return;
+    }
     grid.innerHTML = data.map((p, i) => buildCard(p, i)).join('');
   }
 
   /** Sort variants by lowest price */
   function sortProducts(key, data) {
     const sorted = [...data];
-    // Helper to get lowest price of a variant
     const getLowest = (p) => {
-        const prices = Object.values(p.platforms).map(x => x.lowest_price);
-        return prices.length ? Math.min(...prices) : 999999999;
+      const prices = Object.values(p.platforms).map(x => x.lowest_price);
+      return prices.length ? Math.min(...prices) : 999999999;
     };
-    
     switch (key) {
       case 'price-asc':  return sorted.sort((a, b) => getLowest(a) - getLowest(b));
       case 'price-desc': return sorted.sort((a, b) => getLowest(b) - getLowest(a));
@@ -316,52 +710,73 @@ const Products = (() => {
     }
   }
 
-  /** Simulate a refresh with skeleton effect */
+  // Track the current active query so render() can build appropriate empty-state messages
+  let currentQuery = '';
+
+  /** Fetch product data from the server and render the grid */
   async function refresh(query = '') {
+    /*
+     * BUG FIX: Previously, when no query was supplied, the function still
+     * showed skeleton loaders and fired a fetch to /api/products (no ?q=).
+     * The server returned mock iPhone data with dead "#" buy links.
+     *
+     * Fix: skip the fetch entirely when there is no query and show the
+     * empty/welcome state immediately.
+     */
+    currentQuery = query.trim();
+
+    if (!currentQuery) {
+      currentProductData = [];
+      render([]);
+      return;
+    }
+
+    // Show skeleton loaders while fetching
     grid.innerHTML = `
       <div class="skeleton-card"><div class="skeleton-shine"></div><div class="sk-block sk-tall"></div><div class="sk-block sk-med"></div><div class="sk-block sk-short"></div></div>
       <div class="skeleton-card"><div class="skeleton-shine"></div><div class="sk-block sk-tall"></div><div class="sk-block sk-med"></div><div class="sk-block sk-short"></div></div>
       <div class="skeleton-card"><div class="skeleton-shine"></div><div class="sk-block sk-tall"></div><div class="sk-block sk-med"></div><div class="sk-block sk-short"></div></div>
     `;
+
     try {
-      const url = query ? `/api/products?q=${encodeURIComponent(query)}` : '/api/products';
+      const url = `/api/products?q=${encodeURIComponent(currentQuery)}`;
       const res = await fetch(url);
       const data = await res.json();
-      
-      // Fetch history data concurrently or after
-      const queryToFetch = data.search_query || query;
+
+      // Fetch history / prediction charts in background
+      const queryToFetch = data.search_query || currentQuery;
       if (typeof Charts !== 'undefined' && Charts.fetchHistory) {
-          Charts.fetchHistory(queryToFetch).then(histData => {
-              Charts.renderHistoricalChart(histData);
+        Charts.fetchHistory(queryToFetch).then(histData => {
+          Charts.renderHistoricalChart(histData);
+        });
+        if (typeof Prediction !== 'undefined' && Prediction.fetchPrediction) {
+          Prediction.fetchPrediction(queryToFetch).then(predData => {
+            Prediction.renderPrediction(predData);
+            Charts.renderPredictionChart(predData);
           });
-          if (typeof Prediction !== 'undefined' && Prediction.fetchPrediction) {
-              Prediction.fetchPrediction(queryToFetch).then(predData => {
-                  Prediction.renderPrediction(predData);
-                  Charts.renderPredictionChart(predData);
-              });
-          }
+        }
       }
-      
-      // Update global
+
       currentProductData = data.results || [];
-      
-      // Update the page title
+
+      // Update the section title
       if (data.search_query) {
         const titleEl = document.getElementById('productTitle');
         if (titleEl) {
           titleEl.innerText = data.search_query.charAt(0).toUpperCase() + data.search_query.slice(1);
         }
       }
-      
+
       render(sortProducts(sortSelect.value, currentProductData));
     } catch (e) {
       console.error(e);
-      grid.innerHTML = '<p style="color: #ff6b6b; padding: 20px;">Error loading products from server.</p>';
+      grid.innerHTML = '<p style="color: #ff6b6b; padding: 20px;">Error loading products from server. Please try again.</p>';
     }
   }
 
   function init() {
-    refresh();
+    // Show empty/welcome state on load — do NOT auto-fetch
+    render([]);
 
     sortSelect.addEventListener('change', () => {
       render(sortProducts(sortSelect.value, currentProductData));
@@ -790,6 +1205,9 @@ const Notifications = (() => {
    14. APP INIT — Bootstrap everything when DOM is ready
 ---------------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
+  Auth.init();
+  Auth.checkStatus();
+  
   Sidebar.init();
   Search.init();
   SmoothScroll.init();
